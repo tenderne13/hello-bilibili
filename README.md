@@ -39,6 +39,9 @@ python3 crawl.py
 ## 4.分析数据
 ### 4.1 分析图表
 执行以下指令并输入bvid,会在对应根目录下生成分析图片
+
+```注意，代码中字体渲染部分需要指定对应的字体路径```
+详见 font_path 属性定义
 ```shell
 python3 drawTable.py
 ```
