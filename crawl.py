@@ -46,9 +46,9 @@ def create_assist_date(datestart=None, dateend=None):
 
 # 获取日期输入
 def get_dates():
-    des = input('输入爬取弹幕的“开始日期 结束日期”：')
+    des = input('输入爬取弹幕的“开始日期”：')
     dates = des.split()
-    date_list = create_assist_date(dates[0], dates[-1])
+    date_list = create_assist_date(dates[0])
     return date_list
 
 # 时间戳转换成日期
@@ -86,11 +86,14 @@ if __name__ == '__main__':
         'referer':'https://www.bilibili.com/'
     }
 
-    #bvid = input('输入Bvid：')
-    bvid = 'BV1Aw4m1S7Pd'
+    bvid = input('输入Bvid：')
     cid = get_cid(bvid)
     dates = get_dates()
-    fname = bvid + '_弹幕.csv'
+
+    directory = bvid
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    fname = './'+bvid+'/'+bvid + '_弹幕.csv'
     with open(fname, 'w+', newline='', encoding='utf_8_sig') as f:
         csv_writer = csv.writer(f)
         csv_writer.writerow(["时间", "弹幕", "发送时间"])
@@ -142,6 +145,6 @@ if __name__ == '__main__':
         
 
         # 将json数据写入文件 方便其他方式的分析
-        with open(f"{bvid}.json", 'w', encoding='utf-8') as fjson:
+        with open(f"./{bvid}/{bvid}.json", 'w', encoding='utf-8') as fjson:
             json.dump(allData, fjson, ensure_ascii=False, indent=4)
         f.close()
