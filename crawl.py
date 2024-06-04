@@ -76,7 +76,7 @@ def create_month_date(datestart=None, dateend=None):
     datestart = datetime.datetime.strptime(datestart, '%Y-%m')
     dateend = datetime.datetime.strptime(dateend, '%Y-%m')
     finalList = []
-    while datestart < dateend:
+    while datestart <= dateend:
         finalList.append(datestart.strftime('%Y-%m'))
         # 延后一个月
         datestart += relativedelta(months=1)
