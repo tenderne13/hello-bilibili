@@ -203,7 +203,7 @@ def crawlData():
         # 声明一个list 存储全量json文件
         allData = []
         for ditem in tqdm(dates):
-            logging.info(f"===>获取日期：{ditem}, cookieID index: {last_file_index}")
+            #logging.info(f"===>获取日期：{ditem}, cookieID index: {last_file_index}")
             url = origin_url.format(cid, ditem)
             retry_count = 3
             for _ in range(retry_count):
@@ -227,8 +227,7 @@ def crawlData():
             else:
                 logging.info(f"日期 {ditem} 有 {len(data_json['elems'])} 条弹幕数据")
             # 追加到全量json文件
-            allData += data_json['elems']
-            logging.info(f"===>allData 当前有 {len(allData)} 条数据")
+            #allData += data_json['elems']
             for item in data_json['elems']:
                 retry_count = 1
                 for _ in range(retry_count):
@@ -237,15 +236,13 @@ def crawlData():
                         message = item.get('content')
                         progress = item.get('progress')
                         ptime = get_time2(progress)
-                        milliseconds = to_milliseconds(progress)  # 将时间戳转换为毫秒单位
-                        #danmaku = (milliseconds, message, ctime)
-                        csv_writer.writerow([ptime, message, ctime])
-                        row_count += 1
-                        # if danmaku not in danmaku_set:  # 判断弹幕是否已存在
-                        #     csv_writer.writerow([ptime, message, ctime])
-                        #     row_count += 1
-                        #     # 打印当前写入的行数
-                        #     danmaku_set.add(danmaku)
+                        danmaku_id = item.get('id')
+
+                        if danmaku_id not in danmaku_set:  # 判断弹幕是否已存在
+                            csv_writer.writerow([ptime, message, ctime])
+                            row_count += 1
+                            danmaku_set.add(danmaku_id)
+                            allData.append(item)
                         break
                     except Exception as e:
                         #logging.error("处理弹幕错误: %s", e)
@@ -253,15 +250,16 @@ def crawlData():
                 #else:
                     #logging.info(f"处理弹幕失败，跳过 {item['id']} - {progress}- {message}")
             random_decimal = round(random.uniform(4, 6), 1)
-            logging.info(f"===>获取日期：{ditem} 数据完成")
-            logging.info(f"**********csv_文件 成功写入一共有 {row_count} 行数据")
-            logging.info(f"休息 : {random_decimal} 秒,防止被噼哩噼哩 封ip, cookieID index: {last_file_index}")
+            logging.info(f"===>获取日期：{ditem} 数据完成, csv_文件当前 共有 {row_count} 行数据 ,休息 {random_decimal} 秒, 防止被封ip, cookieID index: {last_file_index}")
+            #logging.info(f"休息 : {random_decimal} 秒,防止被噼哩噼哩 封ip, cookieID index: {last_file_index}")
             time.sleep(random_decimal)
 
         # 将json数据写入文件 方便其他方式的分析
         with open(f"./{bvid}/{bvid}.json", 'w', encoding='utf-8') as fjson:
             json.dump(allData, fjson, ensure_ascii=False, indent=4)
         f.close()
+        logging.info(f"===>allData 当前有 {len(allData)} 条数据")
+        logging.info(f"**********csv_文件 共有 {row_count} 行数据")
         logging.info(f"===>{bvid} 所有弹幕数据爬取完成<====")
 
 
