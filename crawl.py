@@ -37,11 +37,13 @@ def getHeader():
         'accept-language': 'zh-CN,zh;q=0.9',
         'origin': 'https://www.bilibili.com',
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36',
-        'referer':'https://www.bilibili.com/'
+        'referer': 'https://www.bilibili.com/'
     }
     return header
 
+
 header = getHeader()
+
 
 # 获取cid
 def get_cid(bvid):
@@ -49,6 +51,7 @@ def get_cid(bvid):
     page = requests.get(video_url, headers=header).text
     cid = re.search(r'"cid":[0-9]+', page).group()[6:]
     return cid
+
 
 # 生成日期序列
 def create_assist_date(datestart=None, dateend=None):
@@ -66,10 +69,11 @@ def create_assist_date(datestart=None, dateend=None):
         date_list.append(datestart.strftime('%Y-%m-%d'))
     return date_list
 
+
 # 生成月份序列
 def create_month_date(datestart=None, dateend=None):
     if datestart is None:
-        datestart = '2024-05'
+        datestart = '2019-09'
     if dateend is None:
         dateend = datetime.datetime.now().strftime('%Y-%m')
 
@@ -80,8 +84,9 @@ def create_month_date(datestart=None, dateend=None):
         finalList.append(datestart.strftime('%Y-%m'))
         # 延后一个月
         datestart += relativedelta(months=1)
-    print("==> 所有的月份：",finalList)
+    print("==> 所有的月份：", finalList)
     return finalList
+
 
 # 获取日期输入
 def get_dates():
@@ -89,11 +94,13 @@ def get_dates():
     dates = des.split()
     date_list = create_assist_date(dates[0])
     return date_list
+
+
 # 获取当前月有弹幕的日期
 def get_have_danmaku_dates(oid):
     des = input('输入爬取弹幕的 开始月份”：')
     dates = des.split()
-    monthList =  create_month_date(dates[0])
+    monthList = create_month_date(dates[0])
     have_danmaku_dates = []
     for item in monthList:
         try:
@@ -118,6 +125,7 @@ def get_time(ctime):
     otherStyleTime = time.strftime("%Y.%m.%d", timeArray)
     return str(otherStyleTime)
 
+
 # 时间戳转换成时间
 def get_time2(t):
     t1 = float(t) / 1000
@@ -125,19 +133,16 @@ def get_time2(t):
     t3 = time.strftime("%M:%S", t2)
     return t3
 
+
 # 将时间戳转换为毫秒单位
 def to_milliseconds(timestamp):
     return timestamp * 1000
-
-
-
 
 
 def crawlData():
     f_path = os.getcwd()
     fnames = os.listdir(f_path)
 
-    
     header = getHeader()
     bvid = input('输入Bvid：')
     cid = get_cid(bvid)
@@ -148,7 +153,7 @@ def crawlData():
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-    fname = './'+bvid+'/'+bvid + '_弹幕.csv'
+    fname = './' + bvid + '/' + bvid + '_弹幕.csv'
     with open(fname, 'w+', newline='', encoding='utf_8_sig') as f:
         csv_writer = csv.writer(f)
         csv_writer.writerow(["时间", "弹幕", "发送时间"])
@@ -171,7 +176,7 @@ def crawlData():
             else:
                 print(ditem, ':爬取获取数据失败')
                 continue
-            
+
             data_json = json.loads(MessageToJson(DM))
             if 'elems' not in data_json:
                 print(f"日期 {ditem} 没有弹幕数据")
@@ -186,7 +191,7 @@ def crawlData():
                         message = item.get('content')
                         progress = item.get('progress')
                         ptime = get_time2(progress)
-                        milliseconds = to_milliseconds(progress) # 将时间戳转换为毫秒单位
+                        milliseconds = to_milliseconds(progress)  # 将时间戳转换为毫秒单位
                         danmaku = (milliseconds, message, ctime)
                         if danmaku not in danmaku_set:  # 判断弹幕是否已存在
                             csv_writer.writerow([ptime, message, ctime])
@@ -197,11 +202,10 @@ def crawlData():
                         continue
                 else:
                     print(f"处理弹幕失败，跳过 {item['id']} - {progress}- {message}")
-            random_decimal = round(random.uniform(4, 6), 1)
+            random_decimal = round(random.uniform(5, 7), 1)
             print(f"===>获取日期：{ditem} 数据完成")
             print(f"休息 : {random_decimal} 秒,防止被噼哩噼哩 封ip......")
             time.sleep(random_decimal)
-        
 
         # 将json数据写入文件 方便其他方式的分析
         with open(f"./{bvid}/{bvid}.json", 'w', encoding='utf-8') as fjson:
@@ -209,6 +213,7 @@ def crawlData():
         f.close()
         print(f"===>{bvid} 所有弹幕数据爬取完成<====")
 
+
 if __name__ == '__main__':
-    #get_have_danmaku_dates(1507499161)
+    # get_have_danmaku_dates(1507499161)
     crawlData()
