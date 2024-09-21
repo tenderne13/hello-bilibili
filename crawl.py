@@ -18,18 +18,57 @@ import time
 from google.protobuf.message import DecodeError
 import random
 from dateutil.relativedelta import relativedelta
+import logging
+
+# 创建log文件夹
+if not os.path.exists('log'):
+    os.makedirs('log')
+
+# 配置日志记录器
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+# 创建文件处理器
+file_handler = logging.FileHandler('log/crawl.log')
+file_handler.setLevel(logging.INFO)
+
+# 创建控制台处理器
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+
+# 创建格式化器并将其添加到处理器
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+console_handler.setFormatter(formatter)
+
+# 将处理器添加到日志记录器
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
 
 # 获取弹幕api
 origin_url = 'https://api.bilibili.com/x/v2/dm/web/history/seg.so?type=1&oid={}&date={}'
 # 获取月份弹幕索引
 month_url = 'https://api.bilibili.com/x/v2/dm/history/index?type=1&oid={}&month={}'
 
+# 全局变量，用于跟踪上一次读取的文件索引
+last_file_index = -1
+
 
 def getHeader():
-    # 从根目录init文件中读取cookie
-    with open('cookie.init', 'r') as file:
-        # 读取文件内容
-        cookie = file.read()
+    global last_file_index
+    cookie_files = ['cookie.init', 'cookie2.init']
+
+    # 切换到下一个文件
+    last_file_index = (last_file_index + 1) % len(cookie_files)
+    file_name = cookie_files[last_file_index]
+
+    if os.path.exists(file_name):
+        with open(file_name, 'r') as file:
+            cookie = file.read().strip()
+            if not cookie:
+                raise ValueError(f"{file_name} 文件为空")
+    else:
+        raise FileNotFoundError(f"{file_name} 文件未找到")
     header = {
         'accept': '*/*',
         'Cookie': cookie,
@@ -84,7 +123,7 @@ def create_month_date(datestart=None, dateend=None):
         finalList.append(datestart.strftime('%Y-%m'))
         # 延后一个月
         datestart += relativedelta(months=1)
-    print("==> 所有的月份：", finalList)
+    logging.info("==> 所有的月份：%s", finalList)
     return finalList
 
 
@@ -105,17 +144,18 @@ def get_have_danmaku_dates(oid):
     for item in monthList:
         try:
             url = month_url.format(oid, item)
-            print(f"===>请求url：{url}")
+            logging.info(f"===>请求url：{url}")
+            header = getHeader()
             resp = requests.request(url=url, method='get', headers=header)
             data_json = json.loads(resp.text)
             have_danmaku_dates += data_json['data']
         except Exception as e:
-            print(f"请求失败：{e}")
+            logging.error("请求失败：%s", e)
             continue
         random_decimal = round(random.uniform(1, 2), 1)
-        print(f"sleep for a while,in case blocked by pilipli : {random_decimal} s")
+        logging.info(f"休息{random_decimal} 秒防止被封掉 cookieID index: {last_file_index}")
         time.sleep(random_decimal)
-    print(f"==> 所有 有弹幕的日期：{have_danmaku_dates}")
+    logging.info(f"==> 所有 有弹幕的日期：{have_danmaku_dates}")
     return have_danmaku_dates
 
 
@@ -146,6 +186,7 @@ def crawlData():
     header = getHeader()
     bvid = input('输入Bvid：')
     cid = get_cid(bvid)
+    logging.info(f"===>cid:{cid}")
     dates = get_have_danmaku_dates(cid)
 
     # 如果跟目录没有该文件夹，创建文件夹
@@ -157,32 +198,37 @@ def crawlData():
     with open(fname, 'w+', newline='', encoding='utf_8_sig') as f:
         csv_writer = csv.writer(f)
         csv_writer.writerow(["时间", "弹幕", "发送时间"])
+        row_count = 0
         danmaku_set = set()  # 存储已获取的弹幕
         # 声明一个list 存储全量json文件
         allData = []
         for ditem in tqdm(dates):
-            print(f"===>获取日期：{ditem}")
+            logging.info(f"===>获取日期：{ditem}, cookieID index: {last_file_index}")
             url = origin_url.format(cid, ditem)
             retry_count = 3
             for _ in range(retry_count):
                 try:
+                    header = getHeader()
                     html = requests.request(url=url, method='get', headers=header)
                     DM = DmSegMobileReply()
                     DM.ParseFromString(html.content)
                     break
                 except DecodeError as e:
-                    print("解析错误:", e)
+                    logging.info("解析错误:", e)
                     continue
             else:
-                print(ditem, ':爬取获取数据失败')
+                logging.info(ditem, ':爬取获取数据失败')
                 continue
 
             data_json = json.loads(MessageToJson(DM))
             if 'elems' not in data_json:
-                print(f"日期 {ditem} 没有弹幕数据")
+                logging.info(f"日期 {ditem} 没有弹幕数据")
                 continue
+            else:
+                logging.info(f"日期 {ditem} 有 {len(data_json['elems'])} 条弹幕数据")
             # 追加到全量json文件
             allData += data_json['elems']
+            logging.info(f"===>allData 当前有 {len(allData)} 条数据")
             for item in data_json['elems']:
                 retry_count = 1
                 for _ in range(retry_count):
@@ -192,26 +238,31 @@ def crawlData():
                         progress = item.get('progress')
                         ptime = get_time2(progress)
                         milliseconds = to_milliseconds(progress)  # 将时间戳转换为毫秒单位
-                        danmaku = (milliseconds, message, ctime)
-                        if danmaku not in danmaku_set:  # 判断弹幕是否已存在
-                            csv_writer.writerow([ptime, message, ctime])
-                            danmaku_set.add(danmaku)
+                        #danmaku = (milliseconds, message, ctime)
+                        csv_writer.writerow([ptime, message, ctime])
+                        row_count += 1
+                        # if danmaku not in danmaku_set:  # 判断弹幕是否已存在
+                        #     csv_writer.writerow([ptime, message, ctime])
+                        #     row_count += 1
+                        #     # 打印当前写入的行数
+                        #     danmaku_set.add(danmaku)
                         break
                     except Exception as e:
-                        print("处理弹幕错误:", e)
+                        #logging.error("处理弹幕错误: %s", e)
                         continue
-                else:
-                    print(f"处理弹幕失败，跳过 {item['id']} - {progress}- {message}")
-            random_decimal = round(random.uniform(5, 7), 1)
-            print(f"===>获取日期：{ditem} 数据完成")
-            print(f"休息 : {random_decimal} 秒,防止被噼哩噼哩 封ip......")
+                #else:
+                    #logging.info(f"处理弹幕失败，跳过 {item['id']} - {progress}- {message}")
+            random_decimal = round(random.uniform(4, 6), 1)
+            logging.info(f"===>获取日期：{ditem} 数据完成")
+            logging.info(f"**********csv_文件 成功写入一共有 {row_count} 行数据")
+            logging.info(f"休息 : {random_decimal} 秒,防止被噼哩噼哩 封ip, cookieID index: {last_file_index}")
             time.sleep(random_decimal)
 
         # 将json数据写入文件 方便其他方式的分析
         with open(f"./{bvid}/{bvid}.json", 'w', encoding='utf-8') as fjson:
             json.dump(allData, fjson, ensure_ascii=False, indent=4)
         f.close()
-        print(f"===>{bvid} 所有弹幕数据爬取完成<====")
+        logging.info(f"===>{bvid} 所有弹幕数据爬取完成<====")
 
 
 if __name__ == '__main__':
