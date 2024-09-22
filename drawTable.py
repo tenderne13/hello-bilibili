@@ -14,7 +14,12 @@ bvid = input('输入bvid:')
 df = pd.read_csv(f"./{bvid}/{bvid}_弹幕.csv")
 
 # 处理时间数据
-df['时间'] = pd.to_datetime(df['时间'])
+# 将时间列转换为 datetime 格式，指定时间格式
+df['时间'] = pd.to_datetime(df['时间'], format='%H:%M', errors='coerce')
+
+# 处理转换失败的行
+df = df.dropna(subset=['时间'])
+
 # 转换时间为一天中的秒数
 df['时间（秒）'] = df['时间'].dt.hour * 60 + df['时间'].dt.minute 
 df.set_index('时间（秒）', inplace=True)
